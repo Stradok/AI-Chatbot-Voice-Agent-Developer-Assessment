@@ -1,0 +1,28 @@
+{
+  "name": "placidway-kb-chatbot",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "ingest": "node scripts/ingest.mjs",
+    "prebuild": "node scripts/ingest.mjs --fallback",
+    "build": "next build",
+    "start": "next start",
+    "test": "tsx --test tests/*.test.ts",
+    "eval": "node scripts/eval.mjs"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "livekit-client": "^2.23.0",
+    "livekit-server-sdk": "^2.19.2",
+    "next": "^16.4.3",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

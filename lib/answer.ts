@@ -87,13 +87,17 @@ ${blocks || "(no matching content found)"}`;
 const toAscii = (s: string) =>
   s.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x660)).replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x6f0));
 
-// Numbers with 3+ digits (prices, fees) that appear in the answer but in
-// neither the sources nor the user's messages. Catches invented prices.
+// Figures in the answer that are not in the evidence (sources, the user's
+// words, earlier verified answers): catches invented prices. Checked: every number of 3+ digits, and any number attached to a
+// currency. Matching is on digit boundaries, so "500" is not found in "1500".
+const CURRENCY_NUM = /(?:[$€£]\s?(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)\s?(?:usd|eur|dollars?|d[oó]lares|دولار))/giu;
 export function unverifiedNumbers(answer: string, evidence: string): string[] {
-  const norm = (s: string) => toAscii(s).replace(/(\d)[,.\s](?=\d{3}\b)/g, "$1");
+  // drop thousands separators (not newlines, which join separate chunks)
+  const norm = (s: string) => toAscii(s).replace(/(\d)[,.\u066c\u00a0 ](?=\d{3}(?!\d))/g, "$1");
   const ev = norm(evidence);
-  const nums = norm(answer.replace(/\[\d+\]/g, "").replace(/https?:\/\/\S+/g, "")).match(/\d{3,}/g) ?? [];
-  return [...new Set(nums.filter((n) => !ev.includes(n)))];
+  const text = norm(answer.replace(/\[\d+\]/g, "").replace(/https?:\/\/\S+/g, ""));
+  const nums = [...(text.match(/\d{3,}/g) ?? []), ...[...text.matchAll(CURRENCY_NUM)].map((m) => m[1] ?? m[2])];
+  return [...new Set(nums.filter((n) => !new RegExp(`(?<![\\d.])${n.replace(".", "\\.")}(?![\\d]|\\.\\d)`).test(ev)))];
 }
 
 type Draft = { answer?: string; cited?: number[]; answered?: boolean; wants_quote?: boolean };
@@ -114,23 +118,28 @@ export async function respond(history: Msg[], mode: "text" | "voice" = "text"): 
   if (mode === "voice")
     system += `\n\nVOICE MODE: the answer will be spoken aloud. Keep it under 70 words, plain sentences, no markdown, no URLs, no [n] markers (still fill "cited"). Say that the source links are shown in the chat.`;
   const messages = [{ role: "system", content: system }, ...recent];
-  const userText = recent.filter((m) => m.role === "user").map((m) => m.content).join("\n");
+
+  // earlier assistant answers already passed this check, so their figures
+  // count as evidence for follow-ups
+  const evidence = [...chunks.map((c) => c.text), ...recent.map((m) => m.content)].join("\n");
 
   let draft: Draft | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const raw = await llm(messages, 900);
-    draft = parseJson<Draft>(raw) ?? { answer: raw, cited: [], answered: true, wants_quote: false };
-    const cited = (draft.cited ?? []).filter((n) => chunks[n - 1]);
-    // evidence = all retrieved chunks, so a figure cited with the wrong [n] is
-    // not mistaken for an invented one
-    const bad = unverifiedNumbers(draft.answer ?? "", chunks.map((c) => c.text).join("\n") + "\n" + userText);
-    if (!bad.length) {
-      return finish(draft, cited, chunks, language, query);
+    const raw = await llm(messages, 1200);
+    draft = parseJson<Draft>(raw);
+    let problem = "";
+    if (!draft || typeof draft.answer !== "string" || !draft.answer.trim()) {
+      problem = "Your reply was not valid JSON with an \"answer\" string.";
+    } else {
+      // citations = the "cited" list plus any [n] markers used in the text
+      const marked = [...draft.answer.matchAll(/\[(\d+)\]/g)].map((m) => +m[1]);
+      const cited = [...new Set([...(Array.isArray(draft.cited) ? draft.cited.map(Number) : []), ...marked])].filter((n) => chunks[n - 1]);
+      const bad = unverifiedNumbers(draft.answer, evidence);
+      if (bad.length) problem = `These figures are not in SOURCES: ${bad.join(", ")}. Use only figures that appear in SOURCES, or say the information is not listed.`;
+      else if (draft.answered !== false && !cited.length) problem = "You answered without citing any source. Cite the sources you used, or set answered to false if SOURCES do not cover the question.";
+      else return finish(draft, cited, chunks, language, query);
     }
-    messages.push(
-      { role: "assistant", content: raw },
-      { role: "user", content: `SYSTEM CHECK: these figures are not in SOURCES: ${bad.join(", ")}. Rewrite the answer using only figures that appear in SOURCES, or say the information is not listed. JSON only.` },
-    );
+    messages.push({ role: "assistant", content: raw }, { role: "user", content: `SYSTEM CHECK: ${problem} Reply with JSON only.` });
   }
   console.warn(JSON.stringify({ event: "unverified_answer", query, answer: draft?.answer }));
   return {

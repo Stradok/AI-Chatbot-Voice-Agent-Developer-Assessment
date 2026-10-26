@@ -11,7 +11,7 @@ A chatbot that answers visitor questions **only** from 7 PlacidWay pages (ITC Im
 ```
                  ┌──────────── build time (and weekly refresh) ────────────┐
                  │ scripts/ingest.mjs                                      │
- 7 PlacidWay ───►│ robots.txt check · 1 req/s · named User-Agent           │
+ 7 PlacidWay ───►│ robots.txt rules + Crawl-delay (10 s) · named User-Agent │
  URLs            │ cheerio: header + <main> + sidebar, tables → "a | b"    │──► data/kb.json
                  │ heading-based chunks (≤1.5k chars, heading kept)        │    (148 chunks)
                  └─────────────────────────────────────────────────────────┘
@@ -20,8 +20,8 @@ A chatbot that answers visitor questions **only** from 7 PlacidWay pages (ITC Im
         ▲                                             1. rewrite: LLM → standalone English query + language
         │ answer + sources                            2. retrieve: BM25 top-8 (max 4 per page)  lib/retrieve.ts
         │                                             3. answer: LLM with strict rules, JSON out
-        │                                             4. verify: every 3+ digit number must exist in the
-        │                                                sources or the user's words → else retry → else "I don't know"
+        │                                             4. verify: JSON valid, ≥1 citation if answered, and every 3+ digit or currency number must exist in the
+        │                                                sources / conversation → else retry → else "I don't know"
         │                                             5. unanswered → gap log; quote intent → lead form
         │
         └──voice (WebRTC)──► LiveKit Cloud ──► agent/agent.py
@@ -31,7 +31,7 @@ A chatbot that answers visitor questions **only** from 7 PlacidWay pages (ITC Im
 
 | Part | File | What it does |
 |---|---|---|
-| Ingestion | `scripts/ingest.mjs` | Fetches only the 7 URLs. Checks robots.txt, waits 1.1 s between requests, sends a named User-Agent. Keeps the page header (holds the "Price starting from" figure), the article, and the sidebar (price range, address, doctors). Removes nav, footer, other clinics' carousels and forms. Tables become pipe rows so prices stay next to their labels. |
+| Ingestion | `scripts/ingest.mjs` | Fetches only the 7 URLs. Honours robots.txt: Allow/Disallow with wildcards, longest match wins, and `Crawl-delay`. PlacidWay sets 10 s, which is slower than the brief's ~1 req/s, so the whole crawl takes about 70 s. Sends a named User-Agent. Keeps the page header (holds the "Price starting from" figure), the article, and the sidebar (price range, address, doctors). Removes nav, footer, other clinics' carousels and forms. Tables become pipe rows so prices stay next to their labels. |
 | Chunking | same | One chunk per heading section. Tiny sections are merged into the next one, long ones are split at 1.5k characters and keep their heading. A heading that repeats on every card (e.g. the clinic name under each video) is treated as a label, not a section. |
 | Retrieval | `lib/retrieve.ts` | In-memory BM25 over title + heading + text. Indexing the title matters because the three package pages are nearly identical apart from the cancer type. Each page is capped at 4 of the top 8 chunks, so a long page cannot crowd out the others. |
 | Grounding | `lib/answer.ts` | Rewrite → retrieve → answer → verify (see diagram). The model returns JSON (`answer`, `cited`, `answered`, `wants_quote`). Source links are built by the server from the cited chunk numbers, so the model can't invent a URL. |
@@ -39,7 +39,8 @@ A chatbot that answers visitor questions **only** from 7 PlacidWay pages (ITC Im
 | UI | `app/page.tsx` | Chat with suggestion chips, cited `[n]` links, a sources list, and an inline lead form when the user asks for a quote or booking. Includes a voice button. Markdown rendering escapes HTML first (`lib/markdown.ts`). |
 | Voice | `agent/agent.py` | LiveKit Agents worker. Its `llm_node` is replaced by an HTTP call to `/api/chat`, so voice answers use exactly the same retrieval, rules and guard as text. TTS switches to the language the API detected for each reply. |
 | Refresh | `/api/refresh` + `vercel.json` | `prebuild` re-runs ingestion, so a refresh is just a redeploy. Vercel Cron calls `/api/refresh` weekly, and that triggers a Deploy Hook. If PlacidWay is down during a build, the committed `kb.json` is kept (`--fallback`), so a deploy never ships an empty KB. |
-| Logging | `lib/store.ts`, `/api/gaps` | Unanswered questions and leads always go to the server log, and also to Upstash Redis when its env vars are set. `GET /api/gaps` (bearer `CRON_SECRET`) lists them. |
+| Abuse limits | `rateLimited()` in `lib/store.ts` | Per-IP fixed-window limits on `/api/chat` (40 per 10 min), `/api/token` (10) and `/api/lead` (5), plus a 12k-character cap on a conversation. Uses the same Redis and fails open without it. |
+| Logging | `lib/store.ts`, `/api/gaps` | Unanswered questions go to the server log and to Upstash Redis. Leads (name, email) go to Redis only; the log gets a masked email, so PII stays out of logs. Without Redis, leads are not stored. `GET /api/gaps` (bearer `CRON_SECRET`) lists both. |
 
 ### Tools and models, and why
 

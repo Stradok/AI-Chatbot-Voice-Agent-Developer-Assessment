@@ -1,9 +1,11 @@
 import { AccessToken, RoomAgentDispatch, RoomConfiguration } from "livekit-server-sdk";
+import { rateLimited } from "@/lib/store";
 
 const AGENT_NAME = "placidway-voice";
 
 // Issues a short-lived token for a fresh room and dispatches the voice agent into it.
-export async function POST() {
+export async function POST(req: Request) {
+  if (await rateLimited(req, "voice", 10)) return Response.json({ error: "Too many requests, please wait a few minutes." }, { status: 429 });
   const { LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET } = process.env;
   if (!LIVEKIT_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET)
     return Response.json({ error: "Voice is not configured" }, { status: 503 });

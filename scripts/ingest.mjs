@@ -17,8 +17,8 @@ export const SOURCES = [
   ["Price comparison", "https://www.placidway.com/search-medical-pricings/Alternative-Medicine/All/1"],
 ];
 
-const UA = "PlacidWayKBBot/1.0 (+assessment chatbot; one request per second)";
-const DELAY_MS = 1100;
+const UA = "PlacidWayKBBot/1.0 (+assessment chatbot; honours robots.txt Crawl-delay)";
+const MIN_DELAY_MS = 1100; // the brief asks for ~1 req/s; robots.txt Crawl-delay wins if longer
 const MAX_CHUNK = 1500;
 const OUT = new URL("../data/kb.json", import.meta.url);
 
@@ -30,25 +30,36 @@ async function get(url) {
   return res.text();
 }
 
-// Minimal robots.txt check: Disallow rules of groups that apply to "*".
-export function robotsAllows(robotsTxt, path) {
-  const disallow = [];
-  let applies = false, inAgents = false;
+// robots.txt rules of the groups that apply to "*": Allow/Disallow with
+// "*" and "$" wildcards (longest match wins, Allow wins ties) and Crawl-delay.
+export function parseRobots(robotsTxt) {
+  const rules = [];
+  let delay = 0, applies = false, inAgents = false;
   for (const raw of robotsTxt.split("\n")) {
-    const line = raw.replace(/#.*/, "").trim();
-    const m = line.match(/^([\w-]+)\s*:\s*(.*)$/);
+    const m = raw.replace(/#.*/, "").trim().match(/^([\w-]+)\s*:\s*(.*)$/);
     if (!m) continue;
-    const [, key, val] = [m[0], m[1].toLowerCase(), m[2].trim()];
+    const key = m[1].toLowerCase(), val = m[2].trim();
     if (key === "user-agent") {
       if (!inAgents) applies = false;
       inAgents = true;
       if (val === "*") applies = true;
-    } else {
-      inAgents = false;
-      if (applies && key === "disallow" && val) disallow.push(val);
+      continue;
     }
+    inAgents = false;
+    if (!applies) continue;
+    if ((key === "allow" || key === "disallow") && val) {
+      // escape regex chars, "*" -> ".*", a trailing "$" stays an end anchor
+      const re = new RegExp("^" + val.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\\\$$/, "$"));
+      rules.push({ allow: key === "allow", len: val.length, re });
+    } else if (key === "crawl-delay") delay = Math.max(delay, Number(val) || 0);
   }
-  return !disallow.some((rule) => path.startsWith(rule.replace(/\*.*$/, "")));
+  return {
+    delayMs: delay * 1000,
+    allows(path) {
+      const hit = rules.filter((r) => r.re.test(path)).sort((a, b) => b.len - a.len || +b.allow - +a.allow)[0];
+      return !hit || hit.allow;
+    },
+  };
 }
 
 // Turns a page's <main> into plain text with "## " heading markers.
@@ -134,11 +145,13 @@ export function chunk(page) {
 async function main() {
   const fallback = process.argv.includes("--fallback");
   try {
-    const robots = await get("https://www.placidway.com/robots.txt");
+    const robots = parseRobots(await get("https://www.placidway.com/robots.txt"));
+    const delay = Math.max(MIN_DELAY_MS, robots.delayMs);
+    console.log(`crawl delay ${delay / 1000}s`);
     const pages = [];
     for (const [i, [type, url]] of SOURCES.entries()) {
-      if (!robotsAllows(robots, new URL(url).pathname)) throw new Error(`robots.txt disallows ${url}`);
-      await sleep(DELAY_MS);
+      if (!robots.allows(new URL(url).pathname)) throw new Error(`robots.txt disallows ${url}`);
+      await sleep(delay);
       const { title, text } = extract(await get(url));
       if (text.length < 500) throw new Error(`extracted too little text from ${url}`);
       pages.push({ id: `p${i + 1}`, type, url, title, text });

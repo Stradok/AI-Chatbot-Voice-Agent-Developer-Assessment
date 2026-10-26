@@ -1,15 +1,22 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { robotsAllows, extract, chunk } from "../scripts/ingest.mjs";
+import { parseRobots, extract, chunk } from "../scripts/ingest.mjs";
 import { search, KB } from "../lib/retrieve";
 import { unverifiedNumbers, parseJson } from "../lib/answer";
 import { renderMarkdown } from "../lib/markdown";
 
-test("robots.txt: honours Disallow for *", () => {
-  const robots = "User-agent: *\nUser-agent: GPTBot\nAllow: /\nDisallow: /admin/\nDisallow: /uploads/";
-  assert.equal(robotsAllows(robots, "/package/7901/x"), true);
-  assert.equal(robotsAllows(robots, "/admin/login"), false);
-  assert.equal(robotsAllows("User-agent: OtherBot\nDisallow: /", "/package/1"), true);
+test("robots.txt: Allow/Disallow precedence, wildcards, Crawl-delay", () => {
+  const r = parseRobots("User-agent: *\nUser-agent: GPTBot\nAllow: /\nDisallow: /admin/\nDisallow: /editor_images/*.mp3\nDisallow: /*.pdf$\nDisallow: /package\nAllow: /package/7901\nCrawl-delay: 10");
+  assert.equal(r.allows("/profile/5/x"), true);
+  assert.equal(r.allows("/admin/login"), false);
+  assert.equal(r.allows("/editor_images/a/b.mp3"), false);
+  assert.equal(r.allows("/editor_images/a.png"), true);
+  assert.equal(r.allows("/doc.pdf"), false);
+  assert.equal(r.allows("/doc.pdf?x=1"), true);
+  assert.equal(r.allows("/package/7901/x"), true);
+  assert.equal(r.allows("/package/7902/x"), false);
+  assert.equal(r.delayMs, 10000);
+  assert.equal(parseRobots("User-agent: OtherBot\nDisallow: /").allows("/package/1"), true);
 });
 
 test("extract: keeps main content and tables, drops site chrome", () => {
@@ -50,6 +57,14 @@ test("price guard: flags numbers not in the evidence", () => {
   assert.deepEqual(unverifiedNumbers("It costs $12,500", ev), ["12500"]);
   assert.deepEqual(unverifiedNumbers("السعر ١٨٬٩٩٥ دولار", ev.replace(",", "٬")), []);
   assert.deepEqual(unverifiedNumbers("No, it is not $50; it starts at $18995", ev + " I heard $50"), []);
+  // digit boundaries: 500 must not match inside 1,500 / 30,000
+  assert.deepEqual(unverifiedNumbers("Only $500", "Ozone Therapy | $1,500"), ["500"]);
+  assert.deepEqual(unverifiedNumbers("$3,000", "In-Patient $30,000"), ["3000"]);
+  // short currency figures are checked too
+  assert.deepEqual(unverifiedNumbers("A session is $75", ev), ["75"]);
+  assert.deepEqual(unverifiedNumbers("from $64 in Bangkok", "Bangkok, Thailand | $64"), []);
+  // newline between chunks must not glue numbers together
+  assert.deepEqual(unverifiedNumbers("$2500", "costs 2\n500 items"), ["2500"]);
 });
 
 test("parseJson: tolerates code fences", () => {

@@ -190,7 +190,9 @@ export async function respond(history: Msg[], mode: "text" | "voice" | "phone" =
   }
   console.warn(JSON.stringify({ event: "unverified_answer", query, answer: draft?.answer }));
   return {
-    answer: `I couldn't verify that from PlacidWay's pages, so I'd rather not guess. For accurate details, please request a free quote: ${QUOTE_URL}`,
+    answer: personalMedical
+      ? `I can't say whether this is safe or suitable for your situation, and I don't give medical advice. Please talk to your own doctor. I'm happy to tell you what the pages say about the programs in general, or you can request a free quote: ${QUOTE_URL}`
+      : `I couldn't verify that from PlacidWay's pages, so I'd rather not guess. For accurate details, please request a free quote: ${QUOTE_URL}`,
     sources: [],
     answered: false,
     wantsQuote: false,

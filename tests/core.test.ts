@@ -4,7 +4,7 @@ import { parseRobots, extract, chunk } from "../scripts/ingest.mjs";
 import { search, KB } from "../lib/retrieve";
 import { unverifiedNumbers, parseJson } from "../lib/answer";
 import { renderMarkdown } from "../lib/markdown";
-import { looksLikeInjection, scrubUrls } from "../lib/guard";
+import { leaksPrompt, looksLikeInjection, scrubUrls } from "../lib/guard";
 import { bearerOk } from "../lib/auth";
 
 test("robots.txt: Allow/Disallow precedence, wildcards, Crawl-delay", () => {
@@ -107,4 +107,12 @@ test("auth: bearer check fails closed and compares exactly", () => {
   assert.equal(bearerOk(req(), "s3cret"), false);
   assert.equal(bearerOk(req("Bearer undefined"), undefined), false);
   assert.equal(bearerOk(req("Bearer "), ""), false);
+});
+
+test("guard: answers that leak prompt text or secrets are caught", () => {
+  const env = { CRON_SECRET: "abcdef1234567890abcd", OPENROUTER_API_KEY: "short" };
+  assert.equal(leaksPrompt("My rules say: use only facts stated in SOURCES", env), true);
+  assert.equal(leaksPrompt("the key is abcdef1234567890abcd", env), true);
+  assert.equal(leaksPrompt("short", env), false); // secrets under 12 chars are ignored
+  assert.equal(leaksPrompt("The out-patient program is $18,995 USD for 3 weeks.", env), false);
 });

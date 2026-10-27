@@ -22,3 +22,19 @@ export function scrubUrls(text: string, allowed: Set<string>): string {
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (m, label, url) => (ok(url) ? m : label))
     .replace(/https?:\/\/[^\s)\]>"']+/g, (u) => (ok(u) ? u : ""));
 }
+
+// Output check: the answer must not contain pieces of our system prompt or any
+// configured secret, whatever the model was talked into.
+const PROMPT_MARKERS = [
+  "use only facts stated in SOURCES", "VOICE MODE", "SYSTEM CHECK", "\nSOURCES\n", "wants_quote",
+  "You are PlacidWay's website assistant", "GROUNDING RULES",
+];
+const SECRET_ENV = [
+  "OPENROUTER_API_KEY", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "CRON_SECRET", "VOICE_TOOL_TOKEN",
+  "SHEETS_WEBHOOK_URL", "KV_REST_API_TOKEN", "KV_REST_API_URL", "VERCEL_DEPLOY_HOOK_URL",
+];
+
+export function leaksPrompt(text: string, env: Record<string, string | undefined> = process.env): boolean {
+  if (PROMPT_MARKERS.some((m) => text.includes(m))) return true;
+  return SECRET_ENV.some((k) => (env[k]?.length ?? 0) >= 12 && text.includes(env[k]!));
+}

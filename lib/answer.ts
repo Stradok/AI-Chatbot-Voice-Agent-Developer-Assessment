@@ -95,14 +95,14 @@ RULES
 4. Wrong premises: if the user states a price or fact that SOURCES contradict or do not support (e.g. "I heard it costs $50"), do not agree. Say what the pages actually state, or that the figure is not supported.
 5. Medical advice: never diagnose, never judge whether a treatment is safe or suitable for this person's condition, never recommend a treatment. You may share what the pages say in general, then recommend speaking with their doctor.
 6. Out of scope (weather, news, general chit-chat, other topics): politely decline in one or two sentences and say what you can help with. "answered": false.
-7. Booking / appointments: you cannot book or schedule. Point to the free quote form (${QUOTE_URL}) or contact page (${CONTACT_URL}), and offer to pass their name and email to the PlacidWay team for a quote. Set "wants_quote": true whenever the user asks for a quote, booking, appointment, or to be contacted.
+7. Booking / appointments: you cannot book or schedule. Point to the free quote form (${QUOTE_URL}) or contact page (${CONTACT_URL}), and offer to pass their name and email to the PlacidWay team for a quote. Set "wants_quote": true ONLY when the user's own message asks for a quote, booking, appointment or to be contacted; for ordinary price or information questions it must be false, even if your answer mentions the quote page.
 8. Language: reply in the language of the user's last message, even though SOURCES are English. Keep prices, URLs and clinic names unchanged.
 9. Disclaimer: when the answer discusses a treatment, its outcomes or medical details, end with one short line noting this is general information, not medical advice — but only if no earlier assistant message in this conversation already included such a line. Never on price-only, logistics or out-of-scope answers.
 10. Citations: put [n] after the facts taken from source n. List every source number you used in "cited".
 11. Style: concise and friendly, short paragraphs or bullet points, markdown allowed. No preamble.
 
 Reply with JSON only, no code fences:
-{"answer": "<markdown answer>", "cited": [<source numbers>], "answered": <true|false>, "wants_quote": <true|false>}
+{"answer": "your answer in markdown", "cited": [1, 2], "answered": true, "wants_quote": false}
 
 SOURCES
 ${blocks || "(no matching content found)"}`;
@@ -189,7 +189,7 @@ function finish(d: Draft, cited: number[], chunks: Chunk[], language: string, qu
     remap.set(n, p.n);
   }
   const allowed = new Set([QUOTE_URL, CONTACT_URL, ...chunks.map((c) => c.url)]);
-  const answer = scrubUrls(d.answer ?? "", allowed).replace(/\[(\d+)\]/g, (m, n) => (remap.has(+n) ? `[${remap.get(+n)}]` : ""));
+  const answer = scrubUrls((d.answer ?? "").replace(/<\/?(markdown|answer)>/gi, ""), allowed).replace(/\[(\d+)\]/g, (m, n) => (remap.has(+n) ? `[${remap.get(+n)}]` : ""));
   return {
     answer: answer.replace(/(\[\d+\])(\1)+/g, "$1").trim(),
     sources: pages,

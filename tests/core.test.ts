@@ -5,6 +5,7 @@ import { search, KB } from "../lib/retrieve";
 import { unverifiedNumbers, parseJson } from "../lib/answer";
 import { renderMarkdown } from "../lib/markdown";
 import { looksLikeInjection, scrubUrls } from "../lib/guard";
+import { bearerOk } from "../lib/auth";
 
 test("robots.txt: Allow/Disallow precedence, wildcards, Crawl-delay", () => {
   const r = parseRobots("User-agent: *\nUser-agent: GPTBot\nAllow: /\nDisallow: /admin/\nDisallow: /editor_images/*.mp3\nDisallow: /*.pdf$\nDisallow: /package\nAllow: /package/7901\nCrawl-delay: 10");
@@ -97,4 +98,13 @@ test("guard: strips URLs that are not allowed", () => {
   assert.match(out, /placidway\.com\/request-info\./);
   assert.doesNotMatch(out, /evil/);
   assert.match(out, /pay/);
+});
+
+test("auth: bearer check fails closed and compares exactly", () => {
+  const req = (h?: string) => new Request("http://x", { headers: h ? { authorization: h } : {} });
+  assert.equal(bearerOk(req("Bearer s3cret"), "s3cret"), true);
+  assert.equal(bearerOk(req("Bearer s3cre"), "s3cret"), false);
+  assert.equal(bearerOk(req(), "s3cret"), false);
+  assert.equal(bearerOk(req("Bearer undefined"), undefined), false);
+  assert.equal(bearerOk(req("Bearer "), ""), false);
 });

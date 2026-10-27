@@ -40,7 +40,7 @@ A chatbot that answers visitor questions **only** from 7 PlacidWay pages (ITC Im
 | Voice | `agent/agent.py` | LiveKit Agents worker. Its `llm_node` is replaced by an HTTP call to `/api/chat`, so voice answers use exactly the same retrieval, rules and guard as text. TTS switches to the language the API detected for each reply. |
 | Refresh | `/api/refresh` + `vercel.json` | `prebuild` re-runs ingestion, so a refresh is just a redeploy. Vercel Cron calls `/api/refresh` weekly, and that triggers a Deploy Hook. If PlacidWay is down during a build, the committed `kb.json` is kept (`--fallback`), so a deploy never ships an empty KB. |
 | Guardrails | `lib/guard.ts`, `lib/answer.ts` | Hard layer around the prompt rules: obvious prompt-injection / prompt-leak requests are refused without calling the model; URLs in answers are stripped unless they are a cited page or PlacidWay's quote/contact page; replies must be valid JSON with a citation. |
-| Data handling | `lib/store.ts`, `/api/export`, `docs/google-sheets-script.gs` | Every turn (text and voice) is logged as a `chats` row, unanswered ones also as `gaps`, quote requests as `leads`. Free sinks: a **Google Sheet** (paste the Apps Script, set `SHEETS_WEBHOOK_URL`) and/or **Upstash Redis**. `GET /api/export?list=chats\|gaps\|leads` (bearer `CRON_SECRET`) downloads a CSV that opens in Excel; cells are neutralised against formula injection. Logs never contain chat text or lead details. |
+| Data handling | `lib/store.ts`, `/api/export`, `docs/google-sheets-script.gs` | Every turn (text and voice) is logged as a `chats` row, unanswered ones also as `gaps`, quote requests as `leads`. Free sinks: a **Google Sheet** (paste the Apps Script, set `SHEETS_WEBHOOK_URL`) and/or **Upstash Redis**. `GET /api/export?list=chats\|gaps\|leads\|calls` (bearer `CRON_SECRET`) downloads a CSV that opens in Excel; cells are neutralised against formula injection. Logs never contain chat text or lead details. |
 | Abuse limits | `rateLimited()` in `lib/store.ts` | Per-IP fixed-window limits on `/api/chat` (40 per 10 min), `/api/token` (10) and `/api/lead` (5), plus a 12k-character cap on a conversation. Uses the same Redis and fails open without it. |
 | Logging | `lib/store.ts`, `/api/gaps` | Unanswered questions go to the server log and to Upstash Redis. Leads (name, email) go to Redis only; the log gets a masked email, so PII stays out of logs. Without Redis, leads are not stored. `GET /api/gaps` (bearer `CRON_SECRET`) lists both. |
 
@@ -83,6 +83,10 @@ lk agent create --secrets CHAT_API_URL=https://<your-app>.vercel.app/api/chat
 ```
 
 Run it locally instead: `CHAT_API_URL=http://localhost:3000/api/chat LIVEKIT_URL=... LIVEKIT_API_KEY=... LIVEKIT_API_SECRET=... uv run agent.py dev`.
+
+### Voice with a LiveKit Agent Builder agent (alternative to `agent/`)
+
+Set `AGENT_NAME` on Vercel to the builder agent's dispatch name and `VOICE_TOOL_TOKEN` to a shared secret. The agent calls `POST /api/ask` as an HTTP tool (same grounded pipeline, mode `phone`) and reports each finished call to `POST /api/call-end`. Setup and the agent prompt: [`docs/maya-prompt.md`](docs/maya-prompt.md).
 
 ### Refresh content
 

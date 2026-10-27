@@ -71,14 +71,14 @@ Reply with JSON only: {"query": "...", "language": "<ISO 639-1 code of the user'
 // Spoken-answer rules, appended to the system prompt for the LiveKit voice agent.
 // They live here, not in agent.py: the agent's llm_node calls /api/chat, so this
 // is the one place where the voice persona is defined.
-const VOICE_RULES = `
+const voiceRules = (mode: "voice" | "phone") => `
 
 VOICE MODE (the answer is spoken aloud by a text-to-speech voice, over a phone-style call)
 - Sound like a calm, friendly patient coordinator. At most 3 short sentences, under 60 words.
 - Plain spoken sentences: no markdown, bullets, URLs, emoji or [n] markers (still fill "cited").
 - Say prices naturally: "eighteen thousand nine hundred ninety-five US dollars", with the context (out-patient or in-patient, three weeks).
 - Reply in the language the caller spoke. If the transcript looks garbled or off-topic, ask them once to repeat.
-- Do not read lists of sources. End answers that used pages with: "I've put the source links in the chat."
+${mode === "voice" ? "- Do not read lists of sources. End answers that used pages with: \"I've put the source links in the chat.\"" : "- There is no chat window on this call: never mention source links. Name the page you used in passing, for example: \"according to the ITC price list page\"."}
 - For quotes or booking: say you can't book, and that they can leave their name and email in the chat form or use the free quote page on PlacidWay.
 - If the answer is not in SOURCES, say so briefly and offer a free quote.`;
 
@@ -126,7 +126,7 @@ export function unverifiedNumbers(answer: string, evidence: string): string[] {
 
 type Draft = { answer?: string; cited?: number[]; answered?: boolean; wants_quote?: boolean };
 
-export async function respond(history: Msg[], mode: "text" | "voice" = "text"): Promise<BotReply> {
+export async function respond(history: Msg[], mode: "text" | "voice" | "phone" = "text"): Promise<BotReply> {
   const recent = history.slice(-HISTORY_TURNS * 2);
   const last = recent.at(-1)!;
   const transcript = recent.map((m) => `${m.role}: ${m.content}`).join("\n");
@@ -142,7 +142,7 @@ export async function respond(history: Msg[], mode: "text" | "voice" = "text"): 
 
   const chunks = search(query);
   let system = systemPrompt(chunks);
-  if (mode === "voice") system += VOICE_RULES;
+  if (mode !== "text") system += voiceRules(mode);
   const messages = [{ role: "system", content: system }, ...recent];
 
   // earlier assistant answers already passed this check, so their figures

@@ -2,11 +2,12 @@
 // 1. Create a Google Sheet. Extensions > Apps Script > paste this file.
 // 2. Deploy > New deployment > type "Web app" > Execute as: Me > Who has access: Anyone.
 // 3. Copy the web app URL into the Vercel env var SHEETS_WEBHOOK_URL and redeploy.
-// Rows land in tabs named chats, gaps and leads (created on first use).
+// Rows land in tabs named chats, gaps, leads and calls (created on first use).
 const HEADERS = {
   chats: ["at", "mode", "language", "question", "answer", "answered", "sources", "query"],
   gaps: ["at", "question", "query", "mode"],
   leads: ["at", "name", "email", "question"],
+  calls: ["at", "job_id", "room", "started_at", "ended_at", "summary", "results"],
 };
 
 function doPost(e) {

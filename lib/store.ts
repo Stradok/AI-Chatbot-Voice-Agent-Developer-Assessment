@@ -17,7 +17,9 @@ async function redis(cmd: (string | number)[]): Promise<unknown> {
   return (await res.json()).result;
 }
 
-export type List = "chats" | "gaps" | "leads";
+import type { BotReply } from "./answer";
+
+export type List = "chats" | "gaps" | "leads" | "calls";
 
 // Optional Google Sheets sink (free, no Redis needed): a tiny Apps Script web
 // app appends each row to a tab named after the list. See docs/google-sheets-script.gs.
@@ -30,6 +32,7 @@ export async function record(list: List, entry: Record<string, unknown>): Promis
   const logged =
     list === "leads" ? { email: String(entry.email ?? "").replace(/^(.).*(@.*)$/, "$1***$2") }
     : list === "chats" ? { mode: entry.mode, answered: entry.answered }
+    : list === "calls" ? { job_id: entry.job_id }
     : entry;
   console.log(JSON.stringify({ event: list, ...logged }));
   const sinks = [
@@ -40,6 +43,15 @@ export async function record(list: List, entry: Record<string, unknown>): Promis
   ];
   if (!URL_ && !SHEETS_URL && list === "leads") console.warn("store: no Redis or Sheets configured, lead not persisted");
   for (const r of await Promise.allSettled(sinks)) if (r.status === "rejected") console.error(`store: failed to persist ${list}:`, r.reason);
+}
+
+// One chat turn (web text, web voice or phone/maya): always a "chats" row,
+// plus a "gaps" row when the pages did not cover the question.
+export async function logTurn(mode: string, question: string, reply: BotReply): Promise<void> {
+  await Promise.all([
+    record("chats", { mode, language: reply.language, question, answer: reply.answer, answered: reply.answered, sources: reply.sources.map((s) => s.url), query: reply.query }),
+    reply.answered ? null : record("gaps", { question, query: reply.query, mode }),
+  ]);
 }
 
 export async function readList(list: List, n = 1000): Promise<Record<string, unknown>[] | null> {

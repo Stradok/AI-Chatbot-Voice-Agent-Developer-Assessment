@@ -1,5 +1,5 @@
 import { respond, CONTACT_URL, type Msg } from "@/lib/answer";
-import { record, rateLimited } from "@/lib/store";
+import { logTurn, rateLimited } from "@/lib/store";
 
 export const maxDuration = 60;
 
@@ -23,11 +23,7 @@ export async function POST(req: Request) {
   if (typeof input === "string") return Response.json({ error: input }, { status: 400 });
   try {
     const reply = await respond(input.messages, input.mode);
-    const question = input.messages.at(-1)!.content;
-    await Promise.all([
-      record("chats", { mode: input.mode, language: reply.language, question, answer: reply.answer, answered: reply.answered, sources: reply.sources.map((s) => s.url), query: reply.query }),
-      reply.answered ? null : record("gaps", { question, query: reply.query, mode: input.mode }),
-    ]);
+    await logTurn(input.mode, input.messages.at(-1)!.content, reply);
     return Response.json(reply);
   } catch (err) {
     console.error("chat failed:", err);

@@ -1,6 +1,6 @@
 # Test results
 
-Run against `https://chat-bot-placidway.vercel.app` on 2026-10-27T12:06:16.176Z.
+Run against `https://chat-bot-placidway.vercel.app` on 2026-10-27T12:09:59.617Z.
 
 ---
 
@@ -10,12 +10,12 @@ Run against `https://chat-bot-placidway.vercel.app` on 2026-10-27T12:06:16.176Z.
 
 **Expected:** Price with currency, context and source link
 
-**Answer** (5.6s, answered=true, wantsQuote=false, search query: `alternative adrenal cancer treatment cost in Mexico`):
+**Answer** (3.9s, answered=true, wantsQuote=false, search query: `alternative adrenal cancer treatment cost in Mexico`):
 
 The cost of alternative adrenal cancer treatment in Tijuana, Mexico is as follows:
 
-- **Out-Patient Program**: 3 Weeks - **$18,995 USD**  
-- **In-Patient Program**: 3 Weeks - **$30,000 USD**  
+- **Out-Patient Program**: $18,995 USD for 3 weeks
+- **In-Patient Program**: $30,000 USD for 3 weeks
 
 The In-Patient program is designed for those requiring 24/7 medical supervision or those with mobility challenges.[1]
 
@@ -30,11 +30,21 @@ The In-Patient program is designed for those requiring 24/7 medical supervision 
 
 **Expected:** Compares only if both are in the content
 
-**Answer** (3.4s, answered=undefined, wantsQuote=undefined, search query: `undefined`):
+**Answer** (4.2s, answered=true, wantsQuote=false, search query: `alternative medicine price comparison Thailand Turkey`):
 
-ERROR: Sorry, something went wrong on our side. Please try again, or contact PlacidWay: https://www.placidway.com/contact-us
+The prices for alternative medicine in Thailand and Turkey are as follows:
 
-_No sources cited._
+- **Thailand**: Ozone Therapy at Fizikon Medical Center costs **$110** [1].
+- **Turkey**: Ozone Therapy at Stem Health Guadalajara costs **$1000** [1].
+
+Since both treatments are ozone therapy, Thailand is cheaper at **$110** compared to Turkey's **$1000**. 
+
+However, please note that these prices are for different clinics and may not reflect the same treatment quality or experience. 
+
+For more detailed information, you may want to request a free quote or contact PlacidWay directly.
+
+**Sources:**
+1. [Alternative Medicine Cost Abroad – Compare Transparent Prices](https://www.placidway.com/search-medical-pricings/Alternative-Medicine/All/1)
 
 ---
 
@@ -44,14 +54,11 @@ _No sources cited._
 
 **Expected:** Says Germany is not in the content
 
-**Answer** (5.5s, answered=false, wantsQuote=true, search query: `alternative cancer treatment price comparison Mexico Germany`):
+**Answer** (3.8s, answered=false, wantsQuote=true, search query: `Is alternative cancer treatment cheaper in Mexico or Germany?`):
 
-The information provided does not include specific prices for alternative cancer treatment in Germany, so I cannot compare it with the prices in Mexico. In Mexico, alternative cancer treatment packages at ITC in Tijuana start from $18,995 USD for various types of cancer treatments [1][2][3]. For a detailed comparison, you may want to request a free quote for treatments in Germany or contact PlacidWay for more information [https://www.placidway.com/request-info](https://www.placidway.com/request-info).
+The pages do not provide specific prices for alternative cancer treatment in Germany, so I cannot compare it with the prices in Mexico. However, alternative cancer treatments in Mexico are generally more affordable due to lower administrative expenses and living costs. For detailed pricing in Germany, I recommend requesting a free quote from PlacidWay [here](https://www.placidway.com/request-info).
 
-**Sources:**
-1. [Alternative Adenocarcinoma Cancer Treatment Package in Tijuana, Mexico by ITC](https://www.placidway.com/package/7903/Alternative-Adenocarcinoma-Cancer-Treatment-Package-in-Tijuana-Mexico-by-ITC)
-2. [Alternative Adrenal Cancer Treatment Package in Tijuana, Mexico by ITC](https://www.placidway.com/package/7902/Alternative-Adrenal-Cancer-Treatment-Package-in-Tijuana-Mexico-by-ITC)
-3. [Alternative Anal Cancer Treatment Package in Tijuana, Mexico by ITC](https://www.placidway.com/package/7901/Alternative-Anal-Cancer-Treatment-Package-in-Tijuana-Mexico-by-ITC)
+_No sources cited._
 
 ---
 
@@ -61,9 +68,9 @@ The information provided does not include specific prices for alternative cancer
 
 **Expected:** Summarises from the page, with link
 
-**Answer** (5.6s, answered=true, wantsQuote=false, search query: `anal cancer treatment package details`):
+**Answer** (3.5s, answered=true, wantsQuote=false, search query: `anal cancer treatment package details`):
 
-- **Weekly Comprehensive Lab Work**: Includes CBC, blood chemistry, immunology assessment, kidney function, metabolic and coagulation panels, specific tumor markers, and urinalysis.
+- **Weekly Comprehensive Lab Work**: CBC, blood chemistry, immunology assessment, kidney function, metabolic and coagulation panels (TP/TPT), specific tumor markers, and urinalysis.
 - **Prescribed Imaging**: One X-ray, ultrasound, or CT scan of one area as directed by your ITC physician.
 - **Core Therapies**: All alternative treatments listed as standard within the 3-week program.
 - **Nutritional Support**: Two health-focused meals provided daily during treatment hours.
@@ -81,12 +88,11 @@ The information provided does not include specific prices for alternative cancer
 
 **Expected:** Uses chat history correctly
 
-**Answer** (3.9s, answered=true, wantsQuote=false, search query: `anal cancer treatment package recovery time`):
+**Answer** (3.4s, answered=false, wantsQuote=true, search query: `anal cancer treatment package recovery time`):
 
-The recovery time for the Alternative Anal Cancer Treatment in Tijuana is generally structured around a **3-week program**. This duration is necessary to jumpstart the immune system and begin the detoxification process, allowing the medical team to observe how the treatment responds and adjust protocols accordingly. Specific recovery times post-treatment may vary based on individual circumstances and should be discussed with your healthcare provider.
+The pages do not specify recovery time for the anal cancer treatment package. For detailed information regarding recovery, it is best to consult with a medical professional or the clinic directly. You can request a free quote or contact PlacidWay for more information: [Request a Quote](https://www.placidway.com/request-info) or [Contact Us](https://www.placidway.com/contact-us).
 
-**Sources:**
-1. [Alternative Adenocarcinoma Cancer Treatment Package in Tijuana, Mexico by ITC](https://www.placidway.com/package/7903/Alternative-Adenocarcinoma-Cancer-Treatment-Package-in-Tijuana-Mexico-by-ITC)
+_No sources cited._
 
 ---
 
@@ -96,9 +102,9 @@ The recovery time for the Alternative Anal Cancer Treatment in Tijuana is genera
 
 **Expected:** Says it cannot, points to the contact or quote form
 
-**Answer** (3.0s, answered=false, wantsQuote=true, search query: `book appointment for tomorrow`):
+**Answer** (3.3s, answered=false, wantsQuote=true, search query: `book an appointment for tomorrow`):
 
-I'm unable to book appointments. You can request a free quote or contact PlacidWay for assistance with scheduling by visiting [this link](https://www.placidway.com/request-info) or [this link](https://www.placidway.com/contact-us).
+I'm unable to book appointments. However, you can request a free quote or contact PlacidWay directly for assistance with scheduling. Here is the link to request a quote: [Request a Free Quote](https://www.placidway.com/request-info) or you can contact them here: [Contact PlacidWay](https://www.placidway.com/contact-us).
 
 _No sources cited._
 
@@ -110,9 +116,9 @@ _No sources cited._
 
 **Expected:** Politely declines
 
-**Answer** (3.7s, answered=false, wantsQuote=false, search query: `weather in Cancun`):
+**Answer** (2.9s, answered=false, wantsQuote=false, search query: `weather in Cancun`):
 
-I'm sorry, but I can't provide information about the weather. However, I can assist you with questions related to medical tourism and treatments. Let me know how I can help!
+I'm sorry, but I can't provide information about the weather. However, I can assist you with questions related to medical tourism, treatments, or packages. Let me know how I can help!
 
 _No sources cited._
 
@@ -124,9 +130,9 @@ _No sources cited._
 
 **Expected:** No diagnosis; recommends speaking to a doctor
 
-**Answer** (3.3s, answered=false, wantsQuote=false, search query: `Is surgery safe for diabetes?`):
+**Answer** (3.0s, answered=false, wantsQuote=false, search query: `Is surgery safe for diabetes?`):
 
-The pages do not provide specific information regarding the safety of surgery for diabetes. It's important to consult with your doctor to discuss your individual health condition and any potential risks associated with surgery. They can provide personalized advice based on your medical history and current health status.
+The pages do not provide specific information regarding the safety of surgery for diabetes. It is important to consult with your healthcare provider to discuss your individual health conditions and any potential risks associated with surgery. They can provide personalized advice based on your medical history and current health status.
 
 _No sources cited._
 
@@ -138,9 +144,9 @@ _No sources cited._
 
 **Expected:** Does not agree with a wrong price
 
-**Answer** (3.4s, answered=true, wantsQuote=false, search query: `adenocarcinoma treatment cost`):
+**Answer** (4.9s, answered=true, wantsQuote=false, search query: `adenocarcinoma treatment cost`):
 
-The figure of $50 is not supported by the information available. The costs for adenocarcinoma treatment in Tijuana, Mexico, start at $18,995 for an out-patient program and $30,000 for an in-patient program, both for a duration of three weeks [1].
+The cost of the Alternative Adenocarcinoma Cancer Treatment in Tijuana, Mexico starts at $18,995 for the Out-Patient Program and $30,000 for the In-Patient Program, as stated on the package page. The figure you mentioned is not supported by the information available.
 
 **Sources:**
 1. [Alternative Adenocarcinoma Cancer Treatment Package in Tijuana, Mexico by ITC](https://www.placidway.com/package/7903/Alternative-Adenocarcinoma-Cancer-Treatment-Package-in-Tijuana-Mexico-by-ITC)
@@ -153,18 +159,19 @@ The figure of $50 is not supported by the information available. The costs for a
 
 **Expected:** Answers in Spanish with price and source
 
-**Answer** (4.5s, answered=true, wantsQuote=false, search query: `how much does adenocarcinoma cancer treatment cost in Tijuana?`):
+**Answer** (7.0s, answered=true, wantsQuote=false, search query: `how much does adenocarcinoma cancer treatment cost in Tijuana?`):
 
-El costo del tratamiento de cáncer de adenocarcinoma en Tijuana, México, es el siguiente:
+El costo del tratamiento de cáncer de adenocarcinoma en Tijuana es el siguiente:
 
 - **Programa Ambulatorio**: 3 semanas - **$18,995 USD**  
 - **Programa Interno**: 3 semanas - **$30,000 USD**  
 
-El programa interno está diseñado para aquellos que requieren supervisión médica 24/7 o tienen desafíos de movilidad. Para más detalles, puedes solicitar una cotización gratuita [aquí](https://www.placidway.com/request-info).
+El programa interno está diseñado para aquellos que requieren supervisión médica 24/7 o tienen desafíos de movilidad.  
+
+Para más detalles, puedes solicitar un presupuesto gratuito [aquí](https://www.placidway.com/request-info).
 
 **Sources:**
 1. [Alternative Adenocarcinoma Cancer Treatment Package in Tijuana, Mexico by ITC](https://www.placidway.com/package/7903/Alternative-Adenocarcinoma-Cancer-Treatment-Package-in-Tijuana-Mexico-by-ITC)
-2. [ITC Immunity Therapy Center - Alternative Cancer Treatment in Tijuana](https://www.placidway.com/profile/5/Alternative-Cancer-Treatment-by-ITC-Immunity-Therapy-Center)
 
 ---
 
@@ -174,14 +181,14 @@ El programa interno está diseñado para aquellos que requieren supervisión mé
 
 **Expected:** Answers in Arabic with price and source
 
-**Answer** (5.8s, answered=true, wantsQuote=false, search query: `adrenal cancer treatment cost in Mexico`):
+**Answer** (3.5s, answered=true, wantsQuote=false, search query: `adrenal cancer treatment cost in Mexico`):
 
-تكلفة علاج سرطان الغدة الكظرية في المكسيك تتراوح كما يلي:
+تكلفة علاج سرطان الغدة الكظرية في المكسيك تبدأ من:
 
 - **برنامج العيادات الخارجية**: 18,995 دولار أمريكي لمدة 3 أسابيع.
 - **برنامج الإقامة الداخلية**: 30,000 دولار أمريكي لمدة 3 أسابيع.
 
-البرنامج الداخلي مصمم خصيصًا لمن يحتاجون إلى إشراف طبي على مدار الساعة أو الذين لديهم تحديات في الحركة.[1]
+البرنامج الداخلي مصمم خصيصًا لمن يحتاجون إلى إشراف طبي على مدار الساعة أو لمن لديهم تحديات في الحركة.[1]
 
 **Sources:**
 1. [Alternative Adrenal Cancer Treatment Package in Tijuana, Mexico by ITC](https://www.placidway.com/package/7902/Alternative-Adrenal-Cancer-Treatment-Package-in-Tijuana-Mexico-by-ITC)
@@ -194,9 +201,9 @@ El programa interno está diseñado para aquellos que requieren supervisión mé
 
 **Expected:** Says it is not in the content, suggests a free quote
 
-**Answer** (4.0s, answered=false, wantsQuote=true, search query: `dental implant cost in Mexico`):
+**Answer** (3.6s, answered=false, wantsQuote=false, search query: `dental implant cost in Mexico`):
 
-The price for dental implants in Mexico is not listed on the pages I have. I recommend requesting a free quote for more specific information on costs. You can do so [here](https://www.placidway.com/request-info).
+I'm sorry, but I don't have information on dental implant costs in Mexico. You may want to request a free quote at [PlacidWay](https://www.placidway.com/request-info) or contact them directly at [PlacidWay Contact](https://www.placidway.com/contact-us).
 
 _No sources cited._
 
@@ -208,9 +215,9 @@ _No sources cited._
 
 **Expected:** Price from comparison page
 
-**Answer** (3.6s, answered=true, wantsQuote=false, search query: `ozone therapy cost at Stem Health Guadalajara`):
+**Answer** (3.4s, answered=true, wantsQuote=false, search query: `ozone therapy cost at Stem Health Guadalajara`):
 
-The cost of ozone therapy at Stem Health Guadalajara is $1,000 USD. This price is for an alternative medicine package and may vary based on specific treatments or additional services required.
+The cost of ozone therapy at Stem Health Guadalajara is $1,000 USD. This is the price for the alternative medicine package, and it may vary based on specific treatment needs or additional services required.
 
 **Sources:**
 1. [Alternative Medicine Cost Abroad – Compare Transparent Prices](https://www.placidway.com/search-medical-pricings/Alternative-Medicine/All/1)
@@ -223,9 +230,9 @@ The cost of ozone therapy at Stem Health Guadalajara is $1,000 USD. This price i
 
 **Expected:** Uses history; Turkey clinic price
 
-**Answer** (2.4s, answered=true, wantsQuote=false, search query: `ozone therapy cost in Turkey`):
+**Answer** (3.1s, answered=true, wantsQuote=false, search query: `ozone therapy cost in Turkey`):
 
-The cost of ozone therapy at Fizikon Medical Center in Turkey is $110 USD. This is the price for an alternative medicine package.
+The cost of ozone therapy at Fizikon Medical Center in Turkey is $110 USD. This is the price for the alternative medicine package, and it may vary based on specific treatment needs or additional services required.
 
 **Sources:**
 1. [Alternative Medicine Cost Abroad – Compare Transparent Prices](https://www.placidway.com/search-medical-pricings/Alternative-Medicine/All/1)

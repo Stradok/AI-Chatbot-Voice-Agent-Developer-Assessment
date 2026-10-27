@@ -8,7 +8,7 @@ A chatbot that answers visitor questions **only** from 7 PlacidWay pages (ITC Im
 - **Write-up:** `WRITEUP.md` (limitations and what I'd do with another week)
 - **Stack:** Next.js on Vercel · OpenRouter (LLM) · BM25 retrieval · LiveKit (voice) · Google Sheets / Upstash Redis (data, both free tiers)
 
-Contents: [What it does](#what-it-does) · [How it was built](#how-it-was-built-and-why) · [Where to find everything](#where-to-find-everything) · [Architecture](#architecture) · [Components](#components) · [API endpoints](#api-endpoints) · [Configuration](#configuration) · [Setup and deploy](#setup) · [Voice](#voice) · [Demo video guide](#demo-video-guide) · [Review call prep](#review-call-prep) · [Troubleshooting](#troubleshooting) · [Design choices](#design-choices-and-rejected-alternatives) · [Limitations](#known-limitations)
+Contents: [What it does](#what-it-does) · [The story and data flow](#the-story-end-to-end-use-this-to-narrate-the-demo) · [How it was built](#how-it-was-built-and-why) · [Where to find everything](#where-to-find-everything) · [Architecture](#architecture) · [Components](#components) · [API endpoints](#api-endpoints) · [Configuration](#configuration) · [Setup and deploy](#setup) · [Voice](#voice) · [Demo video guide](#demo-video-guide) · [Review call prep](#review-call-prep) · [Troubleshooting](#troubleshooting) · [Design choices](#design-choices-and-rejected-alternatives) · [Limitations](#known-limitations)
 
 ## What it does
 
@@ -22,7 +22,8 @@ Contents: [What it does](#what-it-does) · [How it was built](#how-it-was-built-
 | Chat UI | `app/page.tsx`: suggestions, typing indicator, source chips, lead form, voice button |
 | Refresh | Every build re-ingests the pages; a weekly Vercel Cron redeploys (`/api/refresh`) |
 | Live deployment | Vercel (Hobby plan) |
-| Nice to have | Multilingual answers, follow-ups from chat history, one-time medical disclaimer, lead capture, gap logging, voice agent, CSV/Google Sheet export |
+| Nice to have | Multilingual answers, follow-ups from chat history, one-time medical disclaimer, lead capture, gap logging, voice agent with a live waveform, CSV/Google Sheet export |
+| First-time visitors | A dim hint points at the text box and the Voice button (shown once per browser); a **How to use** popup and a **Contact me** popup (name, email, phone, WhatsApp, GitHub) sit in the header |
 
 ## How it was built, and why
 
@@ -38,6 +39,55 @@ In the order the work happened. Each step lists the decision and the reason.
 8. **Review and hardening.** An independent code review found real issues (ignored Crawl-delay, a price check that accepted "500" inside "1,500", unvalidated model output, no rate limits, PII in logs). All were fixed and covered by unit tests. A second round added attack detection in any language, a leak check, a stricter personal-medical rule, and a fix for forged chat history.
 9. **Voice.** A LiveKit Agent Builder agent (`maya`) calls the same pipeline through an HTTP tool, so voice answers are as grounded as text. A second tool saves leads, and an end-of-call endpoint stores a call summary. A coded agent (`agent/agent.py`) is kept as an alternative.
 10. **Live testing.** `npm run eval` runs the test questions against the deployed app. This found and fixed: a crash from a one-off provider error (now retried), a like-for-like comparison problem (a massage price compared with an ozone-therapy price), a wrong-page attribution on a follow-up, and a stray `<markdown>` tag.
+
+## The story, end to end (use this to narrate the demo)
+
+A visitor lands on a medical-tourism site with money and health worries on their mind. They need an answer that is **true to the page**, not a guess. So the bot is built around one promise: *it can only say what the 7 PlacidWay pages say, and it shows which page.*
+
+1. **Before anyone arrives (build time).** A script reads the 7 pages, politely (robots.txt, 10-second crawl delay), and cuts them into 148 small searchable pieces saved in `data/kb.json`. Every deploy repeats this, and a weekly job redeploys on Monday, so the knowledge stays fresh.
+2. **A visitor types or speaks.** On the website they type (or press **Voice**). First-time visitors see a dim hint pointing at the text box and the Voice button; **How to use** and **Contact me** sit in the header.
+3. **The question is cleaned up.** A language model rewrites it as one clear English search (so Spanish, Arabic or "and what about recovery?" all work) and flags attacks and personal medical questions.
+4. **The best pieces are found.** Plain keyword search (BM25) picks up to 8 pieces from the pages. No second AI is needed for that.
+5. **The answer is written only from those pieces**, with citations. The server, not the model, builds the source links.
+6. **Code double-checks the answer** before it is shown: every price must exist on the pages, there must be a source, no links or secrets leak, no "yes this is safe for you" medical verdicts. A failed check retries once, then a safe fallback is shown.
+7. **Everything is saved** so the team learns from real visitors: every question, the questions the pages could not answer (content gaps), quote requests, and voice-call summaries.
+
+### Data flow: what comes in, what goes out, where it is stored
+
+| Path | In | Goes through | Out (saved to) |
+|---|---|---|---|
+| **Web chat** | Visitor types | `POST /api/chat` → `respond(history, "text")` | Answer + source chips on screen; `chats` row (mode `text`), plus a `gaps` row if unanswered |
+| **Web lead form** | Name + email (appears when the user asks for a quote) | `POST /api/lead` (validated, rate-limited) | `leads` row |
+| **Voice (website button)** | Visitor's microphone | `POST /api/token` mints a 15-minute LiveKit token and dispatches the agent `maya` (`AGENT_NAME`) → LiveKit room | Live waveform in the page; Maya's voice plays back |
+| **Voice answers** | Caller's question | Maya calls the HTTP tool `ask_placidway` → `POST /api/ask` (Bearer `VOICE_TOOL_TOKEN`) → the **same** `respond()` pipeline in "phone" mode | Short spoken answer; `chats` row (mode `phone`), `gaps` if unanswered |
+| **Voice lead** | Name + confirmed email spoken to Maya | Tool `save_lead` → `POST /api/lead` | `leads` row |
+| **End of call** | LiveKit's automatic summary | `POST /api/call-end` | `calls` row (job id, room, start/end, summary) |
+| **Admin / review** | You | `GET /api/export?list=…` (Bearer `CRON_SECRET`) | CSV that opens in Excel (reads Redis) |
+
+**Where rows are stored.** `lib/store.ts → record()` writes each row to two free places at once:
+- **Upstash Redis:** keeps the latest 5,000 per list. This is what `/api/export` and `/api/gaps` read.
+- **Google Sheet** (Apps Script web app): one tab per list, `chats`, `gaps`, `leads`, `calls`. The tabs are created on first use at the **bottom** of the Sheet, so look past `Sheet1`.
+
+If one sink fails the other still saves, and the failure is logged. Server logs never contain chat text or full lead details.
+
+### Which LLM does what, where and when
+
+| Where it runs | What it does | Which model | When it is called |
+|---|---|---|---|
+| **OpenRouter, from `lib/answer.ts`** (call 1, rewrite) | Standalone English search query, language, attack and personal-medical flags | `OPENROUTER_MODEL`. Production is set in Vercel to `openai/gpt-4o-mini`; the code default is two free models (`google/gemma-4-31b-it:free`, then `nvidia/nemotron-3.5-super-vl:free`) | Once per question, unless the injection pattern check refuses it first |
+| **OpenRouter, from `lib/answer.ts`** (call 2, answer) | Writes the grounded answer as JSON from the retrieved pieces only | Same list; each model is tried twice, then the next | Once per question, plus one retry if a code check fails |
+| **LiveKit Cloud, agent `maya`** | Hears the caller (speech-to-text), decides when to call a tool, and speaks (text-to-speech) | Chosen in LiveKit → Agents → maya → Builder → Models & Voice (check there for the exact names; they are not set by this repo) | During a voice call. Maya never answers facts from her own knowledge; she calls `ask_placidway` |
+| **LiveKit Cloud, call ending summary** | Writes the 3-sentence call summary | A small, cheap model set in Call ending → Summary | Once, when the call ends |
+
+Keyword retrieval, the price check, the guardrails and the URL scrub are **plain code, not an LLM**, on purpose: they must not be talked out of their rules.
+
+### What happened along the way (honest log, good for questions in the review)
+
+- **Voice did not connect:** the website dispatched an agent called `placidway-voice`, but the agent deployed in LiveKit is `maya`. Fix: `AGENT_NAME=maya` in Vercel.
+- **Tool calls returned 401:** the `Authorization` header must read `Bearer {{secrets.VOICE_TOOL_TOKEN}}`; the word `Bearer` was missing.
+- **The Google Sheet "wasn't updating":** the code was fine. The rows were landing in the `chats` tab at the bottom, not in `Sheet1`. On the way we also learned that Apps Script answers a POST with a redirect (`curl -X POST` breaks on it, `fetch` does not), and that a web-app deployment must be public (Anyone) and its URL copied with the Copy button. `lib/store.ts` now logs any non-`ok` reply from the Sheet so this can't fail silently again.
+- **Voice leads were missing:** `save_lead` was correctly configured, but the LiveKit agent had not been **redeployed** after the edit. Builder changes apply only to calls made after **Deploy agent**.
+- **Free models are less reliable:** one question failed with a provider error, so each model is now tried twice, and the price guard is in code, not just in the prompt.
 
 ## Where to find everything
 
@@ -224,7 +274,8 @@ The brief says the knowledge base must stay at the 7 given pages, so don't add s
 | `maya` says she doesn't know prices | The tools are not set up: add `ask_placidway`, check the URL and the `Authorization: Bearer {{secrets.VOICE_TOOL_TOKEN}}` header. Check the Events/Logs tab in Live preview |
 | Tool calls return 401 | Header missing `Bearer `, or the LiveKit secret differs from Vercel's `VOICE_TOOL_TOKEN` |
 | `/api/export` says "Redis not configured" | Connect Upstash (Vercel → Storage), then redeploy |
-| Google Sheet stays empty | Check the Apps Script deployment: Execute as **Me**, access **Anyone**; check `SHEETS_WEBHOOK_URL` and redeploy |
+| Google Sheet looks empty | Open the **`chats`** tab at the bottom (the first tab, `Sheet1`, stays empty). Still nothing: check the Apps Script deployment (Execute as **Me**, access **Anyone**), copy its Web app URL with the Copy button (ends in `/exec`), set it as `SHEETS_WEBHOOK_URL` and **redeploy**; then look in Vercel → Logs for `failed to persist` |
+| Voice answers work but no lead is saved | `save_lead` is missing or not deployed. In LiveKit → maya → Builder check the tool, then **Deploy agent**; changes apply only to new calls. Say the email slowly; a misheard email is rejected |
 | Site asks for a Vercel login | You opened a per-deployment URL. Use `https://chat-bot-placidway.vercel.app` |
 | An answer is "I couldn't verify that" | The price check rejected a figure that is not on the pages. This is intended. If it happens on a normal question, run the same question with `npm run eval` and compare the figure with the page text |
 | Sudden failures with free models | Free tiers rate-limit. Set a paid or second model in `OPENROUTER_MODEL` |

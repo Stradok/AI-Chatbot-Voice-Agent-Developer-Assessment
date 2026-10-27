@@ -23,8 +23,11 @@ export async function POST(req: Request) {
   if (typeof input === "string") return Response.json({ error: input }, { status: 400 });
   try {
     const reply = await respond(input.messages, input.mode);
-    if (!reply.answered)
-      await record("gaps", { question: input.messages.at(-1)!.content, query: reply.query, mode: input.mode });
+    const question = input.messages.at(-1)!.content;
+    await Promise.all([
+      record("chats", { mode: input.mode, language: reply.language, question, answer: reply.answer, answered: reply.answered, sources: reply.sources.map((s) => s.url), query: reply.query }),
+      reply.answered ? null : record("gaps", { question, query: reply.query, mode: input.mode }),
+    ]);
     return Response.json(reply);
   } catch (err) {
     console.error("chat failed:", err);

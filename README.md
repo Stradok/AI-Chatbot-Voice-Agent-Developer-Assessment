@@ -39,13 +39,15 @@ A chatbot that answers visitor questions **only** from 7 PlacidWay pages (ITC Im
 | UI | `app/page.tsx` | Chat with suggestion chips, cited `[n]` links, a sources list, and an inline lead form when the user asks for a quote or booking. Includes a voice button. Markdown rendering escapes HTML first (`lib/markdown.ts`). |
 | Voice | `agent/agent.py` | LiveKit Agents worker. Its `llm_node` is replaced by an HTTP call to `/api/chat`, so voice answers use exactly the same retrieval, rules and guard as text. TTS switches to the language the API detected for each reply. |
 | Refresh | `/api/refresh` + `vercel.json` | `prebuild` re-runs ingestion, so a refresh is just a redeploy. Vercel Cron calls `/api/refresh` weekly, and that triggers a Deploy Hook. If PlacidWay is down during a build, the committed `kb.json` is kept (`--fallback`), so a deploy never ships an empty KB. |
+| Guardrails | `lib/guard.ts`, `lib/answer.ts` | Hard layer around the prompt rules: obvious prompt-injection / prompt-leak requests are refused without calling the model; URLs in answers are stripped unless they are a cited page or PlacidWay's quote/contact page; replies must be valid JSON with a citation. |
+| Data handling | `lib/store.ts`, `/api/export`, `docs/google-sheets-script.gs` | Every turn (text and voice) is logged as a `chats` row, unanswered ones also as `gaps`, quote requests as `leads`. Free sinks: a **Google Sheet** (paste the Apps Script, set `SHEETS_WEBHOOK_URL`) and/or **Upstash Redis**. `GET /api/export?list=chats\|gaps\|leads` (bearer `CRON_SECRET`) downloads a CSV that opens in Excel; cells are neutralised against formula injection. Logs never contain chat text or lead details. |
 | Abuse limits | `rateLimited()` in `lib/store.ts` | Per-IP fixed-window limits on `/api/chat` (40 per 10 min), `/api/token` (10) and `/api/lead` (5), plus a 12k-character cap on a conversation. Uses the same Redis and fails open without it. |
 | Logging | `lib/store.ts`, `/api/gaps` | Unanswered questions go to the server log and to Upstash Redis. Leads (name, email) go to Redis only; the log gets a masked email, so PII stays out of logs. Without Redis, leads are not stored. `GET /api/gaps` (bearer `CRON_SECRET`) lists both. |
 
 ### Tools and models, and why
 
 - **Next.js on Vercel**: one deploy holds the UI and the API. The API key stays server-side.
-- **OpenRouter → `anthropic/claude-haiku-5.5`** (set with `OPENROUTER_MODEL`): fast and cheap ($0.10 / $0.50 per M tokens), follows instructions well, handles JSON output and multiple languages. OpenRouter means the model can be swapped without code changes.
+- **OpenRouter, free models by default** (`google/gemma-4-31b-it:free`, then `nvidia/nemotron-3.5-super-vl:free` as fallback; `OPENROUTER_MODEL` takes a comma-separated list): costs nothing and one model falling over (free tiers rate-limit) does not take the bot down. Free models follow the grounding rules less reliably than paid ones, which is why the code-level guards below exist. For the final run set a paid model such as `anthropic/claude-haiku-5.5`.
 - **BM25, not embeddings**: the KB has 148 chunks, and keyword search is exact on the things that matter here (cancer type, "in-patient", country names). The LLM query rewrite translates and de-references every question first, so Spanish/Arabic questions and follow-ups like "what about recovery?" still find the right chunks. No vector DB and no second API.
 - **LiveKit Agents + LiveKit Inference** for voice: Deepgram nova-3 `multi` transcribes mixed languages including Arabic, and Cartesia sonic-3 speaks 40+ languages. Inference runs on the LiveKit project keys, so no extra provider accounts are needed.
 - **Rejected alternatives:** putting the whole KB into every prompt (simpler, but no retrieval to show or tune, and cost grows with content). A vector DB (overkill at this size). A separate LLM prompt inside the voice agent (two copies of the grounding rules would drift apart).
@@ -75,6 +77,8 @@ npm run eval                    # runs the test questions → test-results.md
 cd agent
 lk cloud auth                     # link your LiveKit Cloud project
 lk agent create --secrets CHAT_API_URL=https://<your-app>.vercel.app/api/chat
+# the agent's dispatch name must be "placidway-voice": it is set in agent.py and requested by /api/token.
+# Check with `lk agent list`: if the Dispatch Name column shows something else, the voice button connects but nobody answers.
 # later changes: lk agent deploy
 ```
 

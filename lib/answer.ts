@@ -7,6 +7,7 @@
 //                 sources or the user's own words; otherwise retry once,
 //                 then fall back to "I don't know"
 import { search, type Chunk } from "./retrieve";
+import { INJECTION_REPLY, looksLikeInjection, scrubUrls } from "./guard";
 
 export type Msg = { role: "user" | "assistant"; content: string };
 export type Source = { n: number; title: string; url: string };
@@ -22,25 +23,34 @@ export type BotReply = {
 export const QUOTE_URL = "https://www.placidway.com/request-info";
 export const CONTACT_URL = "https://www.placidway.com/contact-us";
 
-const MODEL = process.env.OPENROUTER_MODEL || "anthropic/claude-haiku-5.5";
+// Comma-separated list, tried in order. Defaults are free OpenRouter models;
+// set OPENROUTER_MODEL to a paid one (e.g. anthropic/claude-haiku-5.5) for better grounding.
+const MODELS = (process.env.OPENROUTER_MODEL || "google/gemma-4-31b-it:free,nvidia/nemotron-3.5-super-vl:free")
+  .split(",").map((m) => m.trim()).filter(Boolean);
 const HISTORY_TURNS = 8;
 
 async function llm(messages: { role: string; content: string }[], maxTokens: number): Promise<string> {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error("OPENROUTER_API_KEY is not set");
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-      "X-Title": "PlacidWay KB Chatbot",
-    },
-    body: JSON.stringify({ model: MODEL, messages, temperature: 0, max_tokens: maxTokens }),
-    signal: AbortSignal.timeout(30000),
-  });
-  if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content ?? "";
+  let lastError: unknown;
+  for (const model of MODELS) {
+    try {
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "X-Title": "PlacidWay KB Chatbot" },
+        body: JSON.stringify({ model, messages, temperature: 0, max_tokens: maxTokens, response_format: { type: "json_object" } }),
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!res.ok) throw new Error(`OpenRouter ${model} ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const content = (await res.json()).choices?.[0]?.message?.content;
+      if (!content) throw new Error(`OpenRouter ${model}: empty reply`);
+      return content;
+    } catch (err) {
+      lastError = err; // free models are often rate-limited: fall through to the next one
+      console.warn(String(err));
+    }
+  }
+  throw lastError;
 }
 
 // Models sometimes wrap JSON in ```json fences or add a sentence around it.
@@ -57,6 +67,20 @@ export function parseJson<T>(raw: string): T | null {
 const REWRITE_PROMPT = `You prepare search queries for a knowledge base of English PlacidWay medical-tourism pages (ITC Immunity Therapy Center in Tijuana, Mexico: clinic profile, adenocarcinoma/adrenal/anal cancer treatment packages, videos, price list, and an alternative-medicine price comparison across countries).
 Given the conversation, rewrite the user's LAST message as one standalone English search query: resolve pronouns and follow-ups from earlier turns (e.g. "what about recovery?" after a question on the adrenal package -> "adrenal cancer treatment package recovery time"), translate to English, keep treatment names, countries and keywords.
 Reply with JSON only: {"query": "...", "language": "<ISO 639-1 code of the user's last message>"}`;
+
+// Spoken-answer rules, appended to the system prompt for the LiveKit voice agent.
+// They live here, not in agent.py: the agent's llm_node calls /api/chat, so this
+// is the one place where the voice persona is defined.
+const VOICE_RULES = `
+
+VOICE MODE (the answer is spoken aloud by a text-to-speech voice, over a phone-style call)
+- Sound like a calm, friendly patient coordinator. At most 3 short sentences, under 60 words.
+- Plain spoken sentences: no markdown, bullets, URLs, emoji or [n] markers (still fill "cited").
+- Say prices naturally: "eighteen thousand nine hundred ninety-five US dollars", with the context (out-patient or in-patient, three weeks).
+- Reply in the language the caller spoke. If the transcript looks garbled or off-topic, ask them once to repeat.
+- Do not read lists of sources. End answers that used pages with: "I've put the source links in the chat."
+- For quotes or booking: say you can't book, and that they can leave their name and email in the chat form or use the free quote page on PlacidWay.
+- If the answer is not in SOURCES, say so briefly and offer a free quote.`;
 
 function systemPrompt(sources: Chunk[]): string {
   const blocks = sources
@@ -107,6 +131,9 @@ export async function respond(history: Msg[], mode: "text" | "voice" = "text"): 
   const last = recent.at(-1)!;
   const transcript = recent.map((m) => `${m.role}: ${m.content}`).join("\n");
 
+  if (looksLikeInjection(last.content))
+    return { answer: INJECTION_REPLY, sources: [], answered: true, wantsQuote: false, language: "en", query: "" };
+
   const rw = parseJson<{ query?: string; language?: string }>(
     await llm([{ role: "system", content: REWRITE_PROMPT }, { role: "user", content: transcript }], 150),
   );
@@ -115,8 +142,7 @@ export async function respond(history: Msg[], mode: "text" | "voice" = "text"): 
 
   const chunks = search(query);
   let system = systemPrompt(chunks);
-  if (mode === "voice")
-    system += `\n\nVOICE MODE: the answer will be spoken aloud. Keep it under 70 words, plain sentences, no markdown, no URLs, no [n] markers (still fill "cited"). Say that the source links are shown in the chat.`;
+  if (mode === "voice") system += VOICE_RULES;
   const messages = [{ role: "system", content: system }, ...recent];
 
   // earlier assistant answers already passed this check, so their figures
@@ -162,7 +188,8 @@ function finish(d: Draft, cited: number[], chunks: Chunk[], language: string, qu
     if (!p) pages.push((p = { n: pages.length + 1, title: c.title, url: c.url }));
     remap.set(n, p.n);
   }
-  const answer = (d.answer ?? "").replace(/\[(\d+)\]/g, (m, n) => (remap.has(+n) ? `[${remap.get(+n)}]` : ""));
+  const allowed = new Set([QUOTE_URL, CONTACT_URL, ...chunks.map((c) => c.url)]);
+  const answer = scrubUrls(d.answer ?? "", allowed).replace(/\[(\d+)\]/g, (m, n) => (remap.has(+n) ? `[${remap.get(+n)}]` : ""));
   return {
     answer: answer.replace(/(\[\d+\])(\1)+/g, "$1").trim(),
     sources: pages,

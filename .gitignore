@@ -8,3 +8,4 @@ next-env.d.ts
 __pycache__
 .venv
 *.pdf
+livekit.md

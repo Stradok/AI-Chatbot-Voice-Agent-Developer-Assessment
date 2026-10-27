@@ -28,6 +28,14 @@ GREETING = "Hi, I'm the PlacidWay assistant. Ask me about treatments and prices 
 FALLBACK = "Sorry, I'm having trouble reaching the PlacidWay information right now. Please try again, or use the free quote form on placidway.com."
 
 
+# The session's LLM is bypassed (llm_node below), so these instructions only
+# document the role. The spoken-answer rules live in VOICE_RULES in lib/answer.ts.
+INSTRUCTIONS = (
+    "You are PlacidWay's voice assistant. You never answer from your own knowledge: every reply "
+    "comes from the PlacidWay knowledge base through /api/chat, in the caller's language."
+)
+
+
 def speakable(text: str) -> str:
     """Strips markdown, citation markers and URLs, which TTS would read out."""
     text = re.sub(r"\[(\d+)\]", "", text)
@@ -41,7 +49,7 @@ def speakable(text: str) -> str:
 
 class KnowledgeAgent(Agent):
     def __init__(self, ctx: JobContext) -> None:
-        super().__init__(instructions="Answers come from the PlacidWay /api/chat endpoint.")
+        super().__init__(instructions=INSTRUCTIONS)
         self._ctx = ctx
         self._http = httpx.AsyncClient(timeout=45)
 

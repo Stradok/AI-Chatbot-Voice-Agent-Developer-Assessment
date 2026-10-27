@@ -4,6 +4,7 @@ import type { Room } from "livekit-client";
 import type { BotReply, Msg } from "@/lib/answer";
 import { renderMarkdown } from "@/lib/markdown";
 import { Waveform } from "./Waveform";
+import { Modal } from "./Overlays";
 
 type Entry =
   | { role: "user"; content: string; via?: "voice" }
@@ -27,6 +28,17 @@ export default function Chat() {
   const [agentTrack, setAgentTrack] = useState<MediaStreamTrack | null>(null);
   const room = useRef<Room | null>(null);
   const end = useRef<HTMLDivElement>(null);
+
+  const [modal, setModal] = useState<"help" | "contact" | null>(null);
+  const [tour, setTour] = useState(false);
+  // first visit: dim the page and point at the two ways to talk
+  useEffect(() => {
+    try { if (!localStorage.getItem("pw-tour")) setTour(true); } catch {}
+  }, []);
+  function endTour() {
+    setTour(false);
+    try { localStorage.setItem("pw-tour", "1"); } catch {}
+  }
 
   useEffect(() => end.current?.scrollIntoView({ behavior: "smooth" }), [log, busy]);
   useEffect(() => () => void room.current?.disconnect(), []);
@@ -102,7 +114,9 @@ export default function Chat() {
 
   const voiceLabel: Record<string, string> = { listening: "Listening… speak in any language", thinking: "Looking it up…", speaking: "Speaking…", connecting: "Connecting…", initializing: "Starting…" };
   return (
-    <main className="app">
+    <main className={`app${tour ? " tour" : ""}`}>
+      {tour && <div className="dim" onClick={endTour} />}
+      {modal && <Modal kind={modal} onClose={() => setModal(null)} />}
       <header>
         <div className="logo" aria-hidden>P</div>
         <div className="title">
@@ -110,6 +124,8 @@ export default function Chat() {
           <p>Answers only from PlacidWay pages · any language · text or voice</p>
         </div>
         {log.length > 0 && <button className="ghost" onClick={() => setLog([])}>New chat</button>}
+        <button className="ghost" onClick={() => setModal("help")}>How to use</button>
+        <button className="contact" onClick={() => setModal("contact")}>Contact me</button>
       </header>
 
       <div className="log" aria-live="polite">
@@ -167,6 +183,13 @@ export default function Chat() {
         </div>
       )}
       <form className="ask" onSubmit={(e) => { e.preventDefault(); ask(input); }}>
+        {tour && (
+          <>
+            <span className="hint left">Type here to chat</span>
+            <span className="hint right">Press to talk</span>
+            <button type="button" className="gotit" onClick={endTour}>Got it</button>
+          </>
+        )}
         <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask a question…" aria-label="Your question" maxLength={2000} />
         <button className="primary" disabled={busy || !input.trim()}>Send</button>
         <button type="button" className={`voice${voice === "on" ? " on" : ""}`} onClick={toggleVoice} disabled={voice === "connecting"} aria-label={voice === "on" ? "Stop voice" : "Start voice"}>

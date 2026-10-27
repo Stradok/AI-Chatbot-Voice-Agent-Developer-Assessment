@@ -10,6 +10,12 @@ Live app: https://chat-bot-placidway.vercel.app · Code: https://github.com/Stra
 
 A chatbot that answers visitor questions **only** from the 7 PlacidWay pages shared in the assessment, shows the page each answer came from, and refuses to invent prices, clinics or medical facts. Visitors can type or talk to it, in any language.
 
+### How to use it
+
+1. **Type.** Open the live app, type a question in any language and press **Send**. Each answer shows the page it came from; click a source chip to open it.
+2. **Talk.** Press the **Voice** button (microphone icon), allow the microphone and speak. A live waveform shows your voice, then Maya's while she answers. Press **Stop** to end.
+3. **Get a quote.** Type or say that you want one. The chat shows a form; on voice, Maya asks for your name and email and saves them.
+
 ### How it works, in five steps
 
 1. **Collect.** A script reads the 7 pages (respecting robots.txt and the site's 10-second crawl delay) and splits them into 148 searchable chunks. It re-runs on every deploy, and a weekly job redeploys automatically, so the content stays fresh.

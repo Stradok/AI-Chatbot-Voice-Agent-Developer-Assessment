@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Room } from "livekit-client";
 import type { BotReply, Msg } from "@/lib/answer";
 import { renderMarkdown } from "@/lib/markdown";
+import { Waveform } from "./Waveform";
 
 type Entry =
   | { role: "user"; content: string; via?: "voice" }
@@ -22,6 +23,8 @@ export default function Chat() {
   const [busy, setBusy] = useState(false);
   const [voice, setVoice] = useState<"off" | "connecting" | "on">("off");
   const [agentState, setAgentState] = useState("");
+  const [micTrack, setMicTrack] = useState<MediaStreamTrack | null>(null);
+  const [agentTrack, setAgentTrack] = useState<MediaStreamTrack | null>(null);
   const room = useRef<Room | null>(null);
   const end = useRef<HTMLDivElement>(null);
 
@@ -54,6 +57,8 @@ export default function Chat() {
       room.current = null;
       setVoice("off");
       setAgentState("");
+      setMicTrack(null);
+      setAgentTrack(null);
       return;
     }
     setVoice("connecting");
@@ -69,7 +74,9 @@ export default function Chat() {
         setLog((l) => [...l, { role: "user", content: question, via: "voice" }, { role: "assistant", content: reply.answer, reply, via: "voice" }]);
       });
       r.on(RoomEvent.TrackSubscribed, (track) => {
-        if (track.kind === Track.Kind.Audio) document.body.appendChild(track.attach());
+        if (track.kind !== Track.Kind.Audio) return;
+        document.body.appendChild(track.attach());
+        setAgentTrack(track.mediaStreamTrack);
       });
       r.on(RoomEvent.ParticipantAttributesChanged, (attrs) => {
         if (attrs["lk.agent.state"]) setAgentState(attrs["lk.agent.state"]);
@@ -78,9 +85,12 @@ export default function Chat() {
         room.current = null;
         setVoice("off");
         setAgentState("");
+        setMicTrack(null);
+        setAgentTrack(null);
       });
       await r.connect(cfg.url, cfg.token);
       await r.localParticipant.setMicrophoneEnabled(true);
+      setMicTrack(r.localParticipant.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack ?? null);
       room.current = r;
       setVoice("on");
       setAgentState("connecting");
@@ -143,8 +153,17 @@ export default function Chat() {
 
       {voice !== "off" && (
         <div className="voicebar" role="status">
-          <span className={`pulse ${voice === "connecting" ? "thinking" : agentState}`} />
-          {voice === "connecting" ? "Connecting voice…" : voiceLabel[agentState] ?? "Voice connected"}
+          <div className="voicerow">
+            <span className={`pulse ${voice === "connecting" ? "thinking" : agentState}`} />
+            {voice === "connecting" ? "Connecting voice…" : voiceLabel[agentState] ?? "Voice connected"}
+          </div>
+          {voice === "on" && (
+            <Waveform
+              track={agentState === "speaking" && agentTrack ? agentTrack : micTrack}
+              tone={agentState === "speaking" ? "agent" : "you"}
+              label={agentState === "speaking" ? "Assistant voice level" : "Your voice level"}
+            />
+          )}
         </div>
       )}
       <form className="ask" onSubmit={(e) => { e.preventDefault(); ask(input); }}>

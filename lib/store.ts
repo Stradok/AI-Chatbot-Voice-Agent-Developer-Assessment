@@ -38,7 +38,11 @@ export async function record(list: List, entry: Record<string, unknown>): Promis
   const sinks = [
     redis(["LPUSH", list, JSON.stringify(row)]).then(() => redis(["LTRIM", list, 0, 4999])),
     SHEETS_URL
-      ? fetch(SHEETS_URL, { method: "POST", body: JSON.stringify({ sheet: list, row }), signal: AbortSignal.timeout(8000) })
+      ? fetch(SHEETS_URL, { method: "POST", body: JSON.stringify({ sheet: list, row }), signal: AbortSignal.timeout(8000) }).then(async (res) => {
+          // the script answers "ok"; a wrong deployment or script error returns a 200 HTML page
+          const body = await res.text();
+          if (!res.ok || body.trim() !== "ok") throw new Error(`sheets ${res.status}: ${body.replace(/\s+/g, " ").slice(0, 150)}`);
+        })
       : null,
   ];
   if (!URL_ && !SHEETS_URL && list === "leads") console.warn("store: no Redis or Sheets configured, lead not persisted");

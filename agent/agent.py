@@ -84,7 +84,7 @@ class KnowledgeAgent(Agent):
 server = AgentServer()
 
 
-@server.rtc_session(agent_name="placidway-voice")
+@server.rtc_session(agent_name=os.environ.get("AGENT_NAME", "placidway-voice"))
 async def entrypoint(ctx: JobContext) -> None:
     session = AgentSession(
         stt=inference.STT(model="deepgram/nova-3", language="multi"),

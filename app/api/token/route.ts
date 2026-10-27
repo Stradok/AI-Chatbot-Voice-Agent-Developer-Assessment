@@ -1,7 +1,7 @@
 import { AccessToken, RoomAgentDispatch, RoomConfiguration } from "livekit-server-sdk";
 import { rateLimited } from "@/lib/store";
 
-const AGENT_NAME = "placidway-voice";
+const AGENT_NAME = process.env.AGENT_NAME || "placidway-voice"; // must equal the deployed agent's dispatch name (`lk agent list`)
 
 // Issues a short-lived token for a fresh room and dispatches the voice agent into it.
 export async function POST(req: Request) {

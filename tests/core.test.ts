@@ -4,7 +4,7 @@ import { parseRobots, extract, chunk } from "../scripts/ingest.mjs";
 import { search, KB } from "../lib/retrieve";
 import { unverifiedNumbers, parseJson } from "../lib/answer";
 import { renderMarkdown } from "../lib/markdown";
-import { leaksPrompt, looksLikeInjection, scrubUrls } from "../lib/guard";
+import { givesVerdict, leaksPrompt, looksLikeInjection, scrubUrls } from "../lib/guard";
 import { bearerOk } from "../lib/auth";
 
 test("robots.txt: Allow/Disallow precedence, wildcards, Crawl-delay", () => {
@@ -115,4 +115,11 @@ test("guard: answers that leak prompt text or secrets are caught", () => {
   assert.equal(leaksPrompt("the key is abcdef1234567890abcd", env), true);
   assert.equal(leaksPrompt("short", env), false); // secrets under 12 chars are ignored
   assert.equal(leaksPrompt("The out-patient program is $18,995 USD for 3 weeks.", env), false);
+});
+
+test("guard: personal-medical verdict wording is detected", () => {
+  assert.equal(givesVerdict("The In-Patient program is highly recommended for you."), true);
+  assert.equal(givesVerdict("Yes, it is safe."), true);
+  assert.equal(givesVerdict("It is suitable for patients with low energy."), true);
+  assert.equal(givesVerdict("I can't judge your situation. The pages describe a 3-week program; please ask your doctor."), false);
 });

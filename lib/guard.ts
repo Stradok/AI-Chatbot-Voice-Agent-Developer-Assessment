@@ -38,3 +38,7 @@ export function leaksPrompt(text: string, env: Record<string, string | undefined
   if (PROMPT_MARKERS.some((m) => text.includes(m))) return true;
   return SECRET_ENV.some((k) => (env[k]?.length ?? 0) >= 12 && text.includes(env[k]!));
 }
+
+// For personal-medical questions: wording that amounts to a suitability verdict.
+export const givesVerdict = (text: string) =>
+  /\b(highly\s+)?recommended\b|\b(is|are|would be|will be|should be)\s+(very\s+)?(safe|suitable|appropriate|fine|ideal|best)\b|\byes\b[,.!]/i.test(text);

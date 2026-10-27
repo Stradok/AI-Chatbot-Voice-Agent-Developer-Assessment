@@ -7,7 +7,7 @@
 //                 sources or the user's own words; otherwise retry once,
 //                 then fall back to "I don't know"
 import { KB, search, type Chunk } from "./retrieve";
-import { INJECTION_REPLY, leaksPrompt, looksLikeInjection, scrubUrls } from "./guard";
+import { INJECTION_REPLY, givesVerdict, leaksPrompt, looksLikeInjection, scrubUrls } from "./guard";
 
 export type Msg = { role: "user" | "assistant"; content: string };
 export type Source = { n: number; title: string; url: string };
@@ -151,7 +151,8 @@ export async function respond(history: Msg[], mode: "text" | "voice" | "phone" =
 
   const chunks = search(query);
   let system = systemPrompt(chunks);
-  if (rw?.personal_medical === true)
+  const personalMedical = rw?.personal_medical === true;
+  if (personalMedical)
     system += "\n\nTHIS QUESTION ASKS FOR A PERSONAL MEDICAL JUDGMENT. Do not answer yes or no and do not say anything is recommended or suitable for them. Say you cannot judge what is right for their situation, share only what the pages say in general (cited), and advise them to speak with their own doctor. Include the short medical disclaimer.";
   if (mode !== "text") system += voiceRules(mode);
   const messages = [{ role: "system", content: system }, ...recent];
@@ -181,6 +182,7 @@ export async function respond(history: Msg[], mode: "text" | "voice" | "phone" =
       const cited = [...new Set([...(Array.isArray(draft.cited) ? draft.cited.map(Number) : []), ...marked])].filter((n) => chunks[n - 1]);
       const bad = unverifiedNumbers(draft.answer, evidence);
       if (bad.length) problem = `These figures are not in SOURCES: ${bad.join(", ")}. Use only figures that appear in SOURCES, or say the information is not listed.`;
+      else if (personalMedical && givesVerdict(draft.answer)) problem = "This is a personal medical question: do not say anything is recommended, suitable, safe or \"yes\" for the user. Say you cannot judge their situation, give only what the pages say in general, and advise speaking with their doctor.";
       else if (draft.answered !== false && !cited.length) problem = "You answered without citing any source. Cite the sources you used, or set answered to false if SOURCES do not cover the question.";
       else return finish(draft, cited, chunks, language, query);
     }

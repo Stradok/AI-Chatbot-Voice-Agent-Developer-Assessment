@@ -9,3 +9,7 @@ __pycache__
 .venv
 *.pdf
 livekit.md
+
+# Internal notes and agent config (kept locally; archived in Stradok/Archive)
+CLAUDE.md
+AGENTS.md
